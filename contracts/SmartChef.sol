@@ -7,13 +7,7 @@ import '@pancakeswap/pancake-swap-lib/contracts/access/Ownable.sol';
 
 // import "@nomiclabs/buidler/console.sol";
 
-interface IWBNB {
-    function deposit() external payable;
-    function transfer(address to, uint256 value) external returns (bool);
-    function withdraw(uint256) external;
-}
-
-contract BnbStaking is Ownable {
+contract SmartChef is Ownable {
     using SafeMath for uint256;
     using SafeBEP20 for IBEP20;
 
@@ -21,7 +15,6 @@ contract BnbStaking is Ownable {
     struct UserInfo {
         uint256 amount;     // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
-        bool inBlackList;
     }
 
     // Info of each pool.
@@ -32,15 +25,9 @@ contract BnbStaking is Ownable {
         uint256 accCakePerShare; // Accumulated CAKEs per share, times 1e12. See below.
     }
 
-    // The REWARD TOKEN
+    // The CAKE TOKEN!
+    IBEP20 public syrup;
     IBEP20 public rewardToken;
-
-    // adminAddress
-    address public adminAddress;
-
-
-    // WBNB
-    address public immutable WBNB;
 
     // CAKE tokens created per block.
     uint256 public rewardPerBlock;
@@ -49,8 +36,6 @@ contract BnbStaking is Ownable {
     PoolInfo[] public poolInfo;
     // Info of each user that stakes LP tokens.
     mapping (address => UserInfo) public userInfo;
-    // limit 10 BNB here
-    uint256 public limitAmount = 10000000000000000000;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
     // The block number when CAKE mining starts.
@@ -63,24 +48,21 @@ contract BnbStaking is Ownable {
     event EmergencyWithdraw(address indexed user, uint256 amount);
 
     constructor(
-        IBEP20 _lp,
+        IBEP20 _syrup,
         IBEP20 _rewardToken,
         uint256 _rewardPerBlock,
         uint256 _startBlock,
-        uint256 _bonusEndBlock,
-        address _adminAddress,
-        address _wbnb
+        uint256 _bonusEndBlock
     ) public {
+        syrup = _syrup;
         rewardToken = _rewardToken;
         rewardPerBlock = _rewardPerBlock;
         startBlock = _startBlock;
         bonusEndBlock = _bonusEndBlock;
-        adminAddress = _adminAddress;
-        WBNB = _wbnb;
 
         // staking pool
         poolInfo.push(PoolInfo({
-            lpToken: _lp,
+            lpToken: _syrup,
             allocPoint: 1000,
             lastRewardBlock: startBlock,
             accCakePerShare: 0
@@ -88,33 +70,6 @@ contract BnbStaking is Ownable {
 
         totalAllocPoint = 1000;
 
-    }
-
-    modifier onlyAdmin() {
-        require(msg.sender == adminAddress, "admin: wut?");
-        _;
-    }
-
-    receive() external payable {
-        assert(msg.sender == WBNB); // only accept BNB via fallback from the WBNB contract
-    }
-
-    // Update admin address by the previous dev.
-    function setAdmin(address _adminAddress) public onlyOwner {
-        adminAddress = _adminAddress;
-    }
-
-    function setBlackList(address _blacklistAddress) public onlyAdmin {
-        userInfo[_blacklistAddress].inBlackList = true;
-    }
-
-    function removeBlackList(address _blacklistAddress) public onlyAdmin {
-        userInfo[_blacklistAddress].inBlackList = false;
-    }
-
-    // Set the limit amount. Can only be called by the owner.
-    function setLimitAmount(uint256 _amount) public onlyOwner {
-        limitAmount = _amount;
     }
 
     // Return reward multiplier over the given _from to _to block.
@@ -168,14 +123,10 @@ contract BnbStaking is Ownable {
     }
 
 
-    // Stake tokens to SmartChef
-    function deposit() public payable {
+    // Stake SYRUP tokens to SmartChef
+    function deposit(uint256 _amount) public {
         PoolInfo storage pool = poolInfo[0];
         UserInfo storage user = userInfo[msg.sender];
-
-        require (user.amount.add(msg.value) <= limitAmount, 'exceed the top');
-        require (!user.inBlackList, 'in black list');
-
         updatePool(0);
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accCakePerShare).div(1e12).sub(user.rewardDebt);
@@ -183,36 +134,28 @@ contract BnbStaking is Ownable {
                 rewardToken.safeTransfer(address(msg.sender), pending);
             }
         }
-        if(msg.value > 0) {
-            IWBNB(WBNB).deposit{value: msg.value}();
-            assert(IWBNB(WBNB).transfer(address(this), msg.value));
-            user.amount = user.amount.add(msg.value);
+        if(_amount > 0) {
+            pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            user.amount = user.amount.add(_amount);
         }
         user.rewardDebt = user.amount.mul(pool.accCakePerShare).div(1e12);
 
-        emit Deposit(msg.sender, msg.value);
+        emit Deposit(msg.sender, _amount);
     }
 
-    function safeTransferBNB(address to, uint256 value) internal {
-        (bool success, ) = to.call{gas: 23000, value: value}("");
-        // (bool success,) = to.call{value:value}(new bytes(0));
-        require(success, 'TransferHelper: ETH_TRANSFER_FAILED');
-    }
-
-    // Withdraw tokens from STAKING.
+    // Withdraw SYRUP tokens from STAKING.
     function withdraw(uint256 _amount) public {
         PoolInfo storage pool = poolInfo[0];
         UserInfo storage user = userInfo[msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(0);
         uint256 pending = user.amount.mul(pool.accCakePerShare).div(1e12).sub(user.rewardDebt);
-        if(pending > 0 && !user.inBlackList) {
+        if(pending > 0) {
             rewardToken.safeTransfer(address(msg.sender), pending);
         }
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
-            IWBNB(WBNB).withdraw(_amount);
-            safeTransferBNB(address(msg.sender), _amount);
+            pool.lpToken.safeTransfer(address(msg.sender), _amount);
         }
         user.rewardDebt = user.amount.mul(pool.accCakePerShare).div(1e12);
 
@@ -224,9 +167,9 @@ contract BnbStaking is Ownable {
         PoolInfo storage pool = poolInfo[0];
         UserInfo storage user = userInfo[msg.sender];
         pool.lpToken.safeTransfer(address(msg.sender), user.amount);
-        emit EmergencyWithdraw(msg.sender, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
+        emit EmergencyWithdraw(msg.sender, user.amount);
     }
 
     // Withdraw reward. EMERGENCY ONLY.
