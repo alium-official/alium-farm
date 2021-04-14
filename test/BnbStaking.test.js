@@ -1,13 +1,16 @@
 const { expectRevert, time } = require('@openzeppelin/test-helpers');
 const { assert } = require('chai');
-const CakeToken = artifacts.require('CakeToken');
+
+const BN = require('bn.js');
+
+const AliumToken = artifacts.require('AliumToken');
 const BnbStaking = artifacts.require('BnbStaking');
-const MockBEP20 = artifacts.require('libs/MockBEP20');
-const WBNB = artifacts.require('libs/WBNB');
+const MockBEP20 = artifacts.require('MockBEP20');
+const WBNB = artifacts.require('WBNB');
 
 contract('BnbStaking.......', async ([alice, bob, admin, dev, minter]) => {
   beforeEach(async () => {
-    this.rewardToken = await CakeToken.new({ from: minter });
+    this.rewardToken = await AliumToken.new({ from: minter });
     this.lpToken = await MockBEP20.new('LPToken', 'LP1', '1000000', {
       from: minter,
     });
@@ -26,7 +29,9 @@ contract('BnbStaking.......', async ([alice, bob, admin, dev, minter]) => {
   });
 
   it('deposit/withdraw', async () => {
-    await time.advanceBlockTo('10');
+    let latestBlock = await time.latest();
+    latestBlock = (new BN(latestBlock)).add(new BN(1))
+    await time.advanceBlockTo(latestBlock.toString());
     await this.bnbChef.deposit({ from: alice, value: 100 });
     await this.bnbChef.deposit({ from: bob, value: 200 });
     assert.equal(

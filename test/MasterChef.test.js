@@ -1,19 +1,17 @@
 const { expectRevert, time } = require('@openzeppelin/test-helpers');
-const CakeToken = artifacts.require('CakeToken');
-const SyrupBar = artifacts.require('SyrupBar');
+
+const AliumToken = artifacts.require('AliumToken');
 const MasterChef = artifacts.require('MasterChef');
-const MockBEP20 = artifacts.require('libs/MockBEP20');
+const MockBEP20 = artifacts.require('MockBEP20');
 
 contract('MasterChef', ([alice, bob, carol, dev, minter]) => {
     beforeEach(async () => {
-        this.cake = await CakeToken.new({ from: minter });
-        this.syrup = await SyrupBar.new(this.cake.address, { from: minter });
+        this.cake = await AliumToken.new({ from: minter });
         this.lp1 = await MockBEP20.new('LPToken', 'LP1', '1000000', { from: minter });
         this.lp2 = await MockBEP20.new('LPToken', 'LP2', '1000000', { from: minter });
         this.lp3 = await MockBEP20.new('LPToken', 'LP3', '1000000', { from: minter });
-        this.chef = await MasterChef.new(this.cake.address, this.syrup.address, dev, '1000', '100', { from: minter });
+        this.chef = await MasterChef.new(this.cake.address, dev, '1000', '100', { from: minter });
         await this.cake.transferOwnership(this.chef.address, { from: minter });
-        await this.syrup.transferOwnership(this.chef.address, { from: minter });
 
         await this.lp1.transfer(bob, '2000', { from: minter });
         await this.lp2.transfer(bob, '2000', { from: minter });
@@ -95,13 +93,10 @@ contract('MasterChef', ([alice, bob, carol, dev, minter]) => {
 
       await this.cake.approve(this.chef.address, '250', { from: alice });
       await this.chef.enterStaking('240', { from: alice }); //3
-      assert.equal((await this.syrup.balanceOf(alice)).toString(), '240');
       assert.equal((await this.cake.balanceOf(alice)).toString(), '10');
       await this.chef.enterStaking('10', { from: alice }); //4
-      assert.equal((await this.syrup.balanceOf(alice)).toString(), '250');
       assert.equal((await this.cake.balanceOf(alice)).toString(), '249');
       await this.chef.leaveStaking(250);
-      assert.equal((await this.syrup.balanceOf(alice)).toString(), '0');
       assert.equal((await this.cake.balanceOf(alice)).toString(), '749');
 
     });

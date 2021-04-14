@@ -1,16 +1,16 @@
 pragma solidity >0.4.18;
 
 contract WBNB {
-    string public name     = "Wrapped BNB";
-    string public symbol   = "WBNB";
-    uint8  public decimals = 18;
+    string public name = "Wrapped BNB";
+    string public symbol = "WBNB";
+    uint8 public decimals = 18;
 
-    event  Approval(address indexed src, address indexed guy, uint wad);
-    event  Transfer(address indexed src, address indexed dst, uint wad);
-    event  Deposit(address indexed dst, uint wad);
-    event  Withdrawal(address indexed src, uint wad);
+    event Approval(address indexed src, address indexed guy, uint wad);
+    event Transfer(address indexed src, address indexed dst, uint wad);
+    event Deposit(address indexed dst, uint wad);
+    event Withdrawal(address indexed src, uint wad);
 
-    mapping (address => uint)                       public  balanceOf;
+    mapping (address => uint) public  balanceOf;
     mapping (address => mapping (address => uint))  public  allowance;
 
     function a() public payable {
